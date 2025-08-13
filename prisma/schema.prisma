@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  password          String
+  firstName         String
+  lastName          String
+  phone             String?
+  isEmailVerified   Boolean  @default(false)
+  emailVerificationToken String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Affiliate relationship
+  affiliateCode     String?  @unique
+  referredBy        String?
+  referredByUser    User?    @relation("UserReferrals", fields: [referredBy], references: [id])
+  referrals         User[]   @relation("UserReferrals")
+
+  // Affiliate plan
+  hasAffiliatePlan  Boolean  @default(false)
+  affiliatePlanDate DateTime?
+
+  // Relations
+  orders            Order[]
+  earnings          AffiliateEarning[]
+  payments          Payment[]
+  accountStatements AccountStatement[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  category    String
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  total           Float
+  discount        Float       @default(0)
+  status          OrderStatus @default(PENDING)
+  paymentMethodId String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  items           OrderItem[]
+  payment         Payment?
+  affiliateEarnings AffiliateEarning[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  orderId       String?       @unique
+  order         Order?        @relation(fields: [orderId], references: [id])
+  amount        Float
+  type          PaymentType
+  status        PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model AffiliateEarning {
+  id              String   @id @default(cuid())
+  affiliateId     String
+  affiliate       User     @relation(fields: [affiliateId], references: [id])
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id])
+  commissionRate  Float    // Percentage (e.g., 0.05 for 5%)
+  commissionAmount Float
+  status          EarningStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AccountStatement {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  month         Int
+  year          Int
+  totalEarnings Float
+  totalReferrals Int
+  commissionRate Float
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, month, year])
+}
+
+model DiscountCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  discount    Float    // Percentage or fixed amount
+  isPercentage Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime?
+  usageLimit  Int?
+  usedCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentType {
+  AFFILIATE_PLAN
+  PRODUCT_PURCHASE
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum EarningStatus {
+  PENDING
+  APPROVED
+  PAID
+}
